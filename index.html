@@ -3,45 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meu App PWA</title>
+    <title>IconCore - Pro PWA Generator</title>
     
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4A90E2">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f4f7f6; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
-        .btn-group { display: none; flex-direction: column; gap: 10px; margin-top: 20px; }
-        button { padding: 12px; cursor: pointer; border: none; border-radius: 6px; background: #4A90E2; color: white; font-weight: bold; }
-        #offline-status { display:none; background: #e74c3c; color: white; text-align: center; padding: 10px; position: fixed; top: 0; width: 100%; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f2f5; color: #1a1a1a; }
+        .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); text-align: center; max-width: 440px; width: 90%; margin: 20px; }
+        
+        /* Controlos de Design */
+        .controls { background: #f8f9fa; padding: 15px; border-radius: 12px; margin: 20px 0; text-align: left; display: none; }
+        .controls label { font-size: 12px; font-weight: bold; color: #667; display: block; margin-bottom: 5px; }
+        input[type="range"] { width: 100%; margin-bottom: 15px; cursor: pointer; }
+        input[type="color"] { width: 100%; height: 40px; border: none; border-radius: 8px; cursor: pointer; }
+
+        /* Preview */
+        #preview-container { margin: 20px 0; display: none; flex-direction: column; align-items: center; }
+        #preview-img { width: 140px; height: 140px; border-radius: 21px; object-fit: cover; box-shadow: 0 8px 20px rgba(0,0,0,0.1); margin-bottom: 10px; background: white; }
+        
+        .btn-group { display: none; flex-direction: column; gap: 10px; }
+        button { padding: 14px; cursor: pointer; border: none; border-radius: 10px; background: #4A90E2; color: white; font-weight: 600; transition: all 0.2s; }
+        button:hover { background: #357ABD; transform: translateY(-1px); }
+        button.success { background-color: #2ecc71 !important; }
+        .btn-clear { background: #e0e0e0; color: #444; margin-top: 15px; font-size: 12px; }
+
+        #offline-status { display:none; background: #e74c3c; color: white; text-align: center; padding: 8px; position: fixed; top: 0; width: 100%; z-index: 1000; }
     </style>
 </head>
 <body>
 
-    <div id="offline-status">Você está offline. O app está usando dados locais.</div>
+    <div id="offline-status">Modo Offline Ativo</div>
 
     <div class="card">
-        <h2>Gerador de Ícones</h2>
-        <p>Selecione seu JPG para gerar os ícones com bordas arredondadas.</p>
-        <input type="file" id="upload" accept="image/jpeg, image/jpg">
+        <h2>IconCore Pro</h2>
+        <p style="font-size: 14px; color: #666;">Cria ícones perfeitos para a tua PWA</p>
+        
+        <input type="file" id="upload" accept="image/jpeg, image/jpg, image/png">
+
+        <div class="controls" id="extraControls">
+            <label>Ajuste de Zoom</label>
+            <input type="range" id="zoomRange" min="0.5" max="2" step="0.01" value="1" oninput="renderToPreview()">
+            
+            <label>Cor de Fundo</label>
+            <input type="color" id="bgColor" value="#ffffff" oninput="renderToPreview()">
+        </div>
+
+        <div id="preview-container">
+            <img id="preview-img" src="" alt="Preview">
+            <p><small style="color: #888;">Prévia com Safe Zone (15%)</small></p>
+        </div>
         
         <div class="btn-group" id="btnGroup">
-            <button onclick="generate(32, 'favicon.png')">Baixar Favicon (32x32)</button>
-            <button onclick="generate(192, 'icon-192.png')">Baixar Ícone 192x192</button>
-            <button onclick="generate(512, 'icon-512.png')">Baixar Ícone 512x512</button>
+            <button onclick="generate(192, 'icon-192.png', this)">Baixar 192x192</button>
+            <button onclick="generate(512, 'icon-512.png', this)">Baixar 512x512</button>
+            <button class="btn-clear" onclick="resetApp()">Recomeçar</button>
         </div>
     </div>
 
     <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
-        // --- LÓGICA DE REDIMENSIONAMENTO E CORTE ---
         const upload = document.getElementById('upload');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const btnGroup = document.getElementById('btnGroup');
+        const extraControls = document.getElementById('extraControls');
+        const previewContainer = document.getElementById('preview-container');
+        const previewImg = document.getElementById('preview-img');
         let img = new Image();
 
         upload.onchange = (e) => {
@@ -50,43 +82,69 @@
                 const reader = new FileReader();
                 reader.onload = (ev) => {
                     img.src = ev.target.result;
-                    img.onload = () => { btnGroup.style.display = 'flex'; };
+                    img.onload = () => { 
+                        btnGroup.style.display = 'flex';
+                        extraControls.style.display = 'block';
+                        previewContainer.style.display = 'flex';
+                        renderToPreview();
+                    };
                 };
                 reader.readAsDataURL(file);
             }
         };
 
-        function generate(size, filename) {
+        function processImage(size) {
             canvas.width = size;
             canvas.height = size;
-            const scale = Math.max(size / img.width, size / img.height);
+            const zoom = parseFloat(document.getElementById('zoomRange').value);
+            const bgColor = document.getElementById('bgColor').value;
+
+            // Preenchimento de fundo
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, size, size);
+
+            const scale = Math.max(size / img.width, size / img.height) * zoom;
             const x = (size / 2) - (img.width / 2) * scale;
             const y = (size / 2) - (img.height / 2) * scale;
 
-            ctx.clearRect(0, 0, size, size);
-            
-            // Bordas arredondadas
+            // Corte arredondado PWA (Safe Zone)
             const r = size * 0.15;
+            ctx.save();
             ctx.beginPath();
-            ctx.moveTo(r,0); ctx.arcTo(size,0,size,size,r); ctx.arcTo(size,size,0,size,r); ctx.arcTo(0,size,0,0,r); ctx.arcTo(0,0,size,0,r);
-            ctx.closePath();
+            ctx.moveTo(r, 0); ctx.arcTo(size, 0, size, size, r); ctx.arcTo(size, size, 0, size, r); 
+            ctx.arcTo(0, size, 0, 0, r); ctx.arcTo(0, 0, size, 0, r); ctx.closePath();
             ctx.clip();
 
             ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+            ctx.restore();
+        }
+
+        function renderToPreview() {
+            processImage(512);
+            previewImg.src = canvas.toDataURL('image/png');
+        }
+
+        function generate(size, filename, btn) {
+            processImage(size);
             const link = document.createElement('a');
             link.download = filename;
             link.href = canvas.toDataURL('image/png');
             link.click();
+            const txt = btn.innerText;
+            btn.innerText = "✓ Gerado!";
+            btn.classList.add('success');
+            setTimeout(() => { btn.innerText = txt; btn.classList.remove('success'); }, 2000);
         }
 
-        // --- STATUS OFFLINE ---
-        window.addEventListener('online', () => document.getElementById('offline-status').style.display = 'none');
-        window.addEventListener('offline', () => document.getElementById('offline-status').style.display = 'block');
-
-        // --- REGISTRO DO SERVICE WORKER ---
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js');
+        function resetApp() {
+            upload.value = "";
+            btnGroup.style.display = 'none';
+            extraControls.style.display = 'none';
+            previewContainer.style.display = 'none';
+            img = new Image();
         }
+
+        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js'); }
     </script>
 </body>
 </html>
