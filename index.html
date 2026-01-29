@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu App PWA</title>
+    
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4A90E2">
+
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f4f7f6; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
+        .btn-group { display: none; flex-direction: column; gap: 10px; margin-top: 20px; }
+        button { padding: 12px; cursor: pointer; border: none; border-radius: 6px; background: #4A90E2; color: white; font-weight: bold; }
+        #offline-status { display:none; background: #e74c3c; color: white; text-align: center; padding: 10px; position: fixed; top: 0; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="offline-status">Você está offline. O app está usando dados locais.</div>
+
+    <div class="card">
+        <h2>Gerador de Ícones</h2>
+        <p>Selecione seu JPG para gerar os ícones com bordas arredondadas.</p>
+        <input type="file" id="upload" accept="image/jpeg, image/jpg">
+        
+        <div class="btn-group" id="btnGroup">
+            <button onclick="generate(32, 'favicon.png')">Baixar Favicon (32x32)</button>
+            <button onclick="generate(192, 'icon-192.png')">Baixar Ícone 192x192</button>
+            <button onclick="generate(512, 'icon-512.png')">Baixar Ícone 512x512</button>
+        </div>
+    </div>
+
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <script>
+        // --- LÓGICA DE REDIMENSIONAMENTO E CORTE ---
+        const upload = document.getElementById('upload');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const btnGroup = document.getElementById('btnGroup');
+        let img = new Image();
+
+        upload.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    img.src = ev.target.result;
+                    img.onload = () => { btnGroup.style.display = 'flex'; };
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        function generate(size, filename) {
+            canvas.width = size;
+            canvas.height = size;
+            const scale = Math.max(size / img.width, size / img.height);
+            const x = (size / 2) - (img.width / 2) * scale;
+            const y = (size / 2) - (img.height / 2) * scale;
+
+            ctx.clearRect(0, 0, size, size);
+            
+            // Bordas arredondadas
+            const r = size * 0.15;
+            ctx.beginPath();
+            ctx.moveTo(r,0); ctx.arcTo(size,0,size,size,r); ctx.arcTo(size,size,0,size,r); ctx.arcTo(0,size,0,0,r); ctx.arcTo(0,0,size,0,r);
+            ctx.closePath();
+            ctx.clip();
+
+            ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // --- STATUS OFFLINE ---
+        window.addEventListener('online', () => document.getElementById('offline-status').style.display = 'none');
+        window.addEventListener('offline', () => document.getElementById('offline-status').style.display = 'block');
+
+        // --- REGISTRO DO SERVICE WORKER ---
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+    </script>
+</body>
+</html>
